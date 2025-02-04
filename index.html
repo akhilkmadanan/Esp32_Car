@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Joystick Control</title>
+    <style>
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
+            background-color: #333;
+            color: white;
+        }
+        #joystick-container {
+            position: absolute;
+            left: 50%;
+            bottom: 10%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 200px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            position: relative;
+        }
+        #joystick {
+            width: 80px;
+            height: 80px;
+            background-color: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            touch-action: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>ESP32 Joystick Control</h2>
+    <div id="joystick-container">
+        <div id="joystick"></div>
+    </div>
+
+    <script>
+        let joystick = document.getElementById("joystick");
+        let container = document.getElementById("joystick-container");
+        let centerX = container.offsetWidth / 2;
+        let centerY = container.offsetHeight / 2;
+
+        let active = false;
+        let lastCommand = "";
+
+        function sendCommand(cmd) {
+            if (cmd !== lastCommand) {
+                fetch("http://172.20.10.2/" + cmd);
+                lastCommand = cmd;
+            }
+        }
+
+        function stopMotors() {
+            sendCommand("stop");
+        }
+
+        function handleMove(event) {
+            let touch = event.touches ? event.touches[0] : event;
+            let x = touch.clientX - container.offsetLeft;
+            let y = touch.clientY - container.offsetTop;
+
+            let dx = x - centerX;
+            let dy = y - centerY;
+            let dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist > 60) {
+                let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+                if (angle > -45 && angle <= 45) sendCommand("right");
+                else if (angle > 45 && angle <= 135) sendCommand("forward");
+                else if (angle > 135 || angle <= -135) sendCommand("left");
+                else if (angle > -135 && angle <= -45) sendCommand("backward");
+            } else {
+                sendCommand("stop");
+            }
+
+            joystick.style.transform = `translate(${dx}px, ${dy}px)`;
+        }
+
+        function handleEnd() {
+            joystick.style.transform = "translate(-50%, -50%)";
+            stopMotors();
+        }
+
+        container.addEventListener("touchstart", handleMove);
+        container.addEventListener("touchmove", handleMove);
+        container.addEventListener("touchend", handleEnd);
+
+        container.addEventListener("mousedown", function (event) {
+            active = true;
+            handleMove(event);
+        });
+
+        document.addEventListener("mousemove", function (event) {
+            if (active) handleMove(event);
+        });
+
+        document.addEventListener("mouseup", function () {
+            active = false;
+            handleEnd();
+        });
+
+    </script>
+</body>
+</html>
